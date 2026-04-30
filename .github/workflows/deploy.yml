@@ -1,0 +1,37 @@
+name: Deploy Apigee Proxy
+
+on:
+  push:
+    branches: [ main, test ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+      
+      # Determine which proxy name to use based on the branch
+      - name: Set Proxy Name
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "PROXY_NAME=my-proxy-prod" >> $GITHUB_ENV
+          else
+            echo "PROXY_NAME=my-proxy-test" >> $GITHUB_ENV
+          fi
+
+      # Authenticate to Google Cloud using the Service Account JSON
+      - name: Authenticate to Google Cloud
+        id: 'auth'
+        uses: 'google-github-actions/auth@v1'
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      # Set up the gcloud CLI
+      - name: Set up Cloud SDK
+        uses: 'google-github-actions/setup-gcloud@v1'
+
+      # Deploy the proxy to the eval environment
+      - name: Deploy to Apigee
+        run: |
+          gcloud apigee apis deploy --api=${{ env.PROXY_NAME }} --environment=eval --override --project=project-231b329b-a80c-4f8d-828
