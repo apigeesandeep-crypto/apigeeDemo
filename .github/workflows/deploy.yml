@@ -2,12 +2,11 @@ name: Deploy Apigee Proxy
 
 on:
   push:
-    branches: [ main, test ]
+    branches: [ test ] # Triggers when you push to the test branch
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # 1. Mandatory permissions for Workload Identity Federation
     permissions:
       contents: 'read'
       id-token: 'write'
@@ -16,16 +15,11 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # Determine which proxy name to use based on the branch
+      # This logic sets the proxy name to "my-proxy-test" for the test branch
       - name: Set Proxy Name
         run: |
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            echo "PROXY_NAME=my-proxy-prod" >> $GITHUB_ENV
-          else
-            echo "PROXY_NAME=my-proxy-test" >> $GITHUB_ENV
-          fi
+          echo "PROXY_NAME=my-proxy-test" >> $GITHUB_ENV
 
-      # 2. Authenticate to Google Cloud using Workload Identity (Keyless)
       - name: Authenticate to Google Cloud
         id: 'auth'
         uses: 'google-github-actions/auth@v2'
@@ -33,11 +27,9 @@ jobs:
           workload_identity_provider: 'projects/172484352684/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
           service_account: 'apigee-github-deployer@project-231b329b-a80c-4f8d-828.iam.gserviceaccount.com'
 
-      # 3. Set up the gcloud CLI
       - name: Set up Cloud SDK
         uses: 'google-github-actions/setup-gcloud@v2'
 
-      # 4. Deploy the proxy to the eval environment
       - name: Deploy to Apigee
         run: |
           gcloud apigee apis deploy \
