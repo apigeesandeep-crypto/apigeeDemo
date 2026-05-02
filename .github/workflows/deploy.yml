@@ -20,6 +20,18 @@ jobs:
         run: |
           echo "PROXY_NAME=hello-world" >> $GITHUB_ENV
 
+       # Bundle the proxy files into a zip (Requirement for import)
+      - name: Bundle API Proxy
+        run: |
+          zip -r apiproxy.zip apiproxy
+
+      # Import the API Proxy to Apigee (Creates the resource if it doesn't exist)
+      - name: Import API Proxy
+        run: |
+          gcloud apigee apis import ${{ env.PROXY_NAME }} \
+            --source=apiproxy.zip \
+            --project=project-231b329b-a80c-4f8d-828
+
       - name: Authenticate to Google Cloud
         id: 'auth'
         uses: 'google-github-actions/auth@v2'
