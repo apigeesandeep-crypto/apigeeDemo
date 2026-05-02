@@ -18,7 +18,7 @@ jobs:
       # This logic sets the proxy name to "my-proxy-test" for the test branch
       - name: Set Proxy Name
         run: |
-          echo "PROXY_NAME=my-proxy-test" >> $GITHUB_ENV
+          echo "PROXY_NAME=basicAuth" >> $GITHUB_ENV
 
       - name: Authenticate to Google Cloud
         id: 'auth'
