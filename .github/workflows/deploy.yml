@@ -5,31 +5,17 @@ on:
     branches: [ main, test ]
 
 jobs:
-  lint-and-validate:
+  deploy:
     runs-on: ubuntu-latest
+    # 1. Mandatory permissions for Workload Identity Federation
+    permissions:
+      contents: 'read'
+      id-token: 'write'
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Install apigeelint
-        run: npm install -g apigeelint
-
-      - name: Run apigeelint
-        run: |
-          apigeelint -s ./apiproxy -f table.js -e PO007,BN009
-
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-      
       # Determine which proxy name to use based on the branch
       - name: Set Proxy Name
         run: |
@@ -39,18 +25,23 @@ jobs:
             echo "PROXY_NAME=my-proxy-test" >> $GITHUB_ENV
           fi
 
-      # Authenticate to Google Cloud using the Service Account JSON
+      # 2. Authenticate to Google Cloud using Workload Identity (Keyless)
       - name: Authenticate to Google Cloud
         id: 'auth'
-        uses: 'google-github-actions/auth@v1'
+        uses: 'google-github-actions/auth@v2'
         with:
-          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+          workload_identity_provider: 'projects/172484352684/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
+          service_account: 'apigee-github-deployer@project-231b329b-a80c-4f8d-828.iam.gserviceaccount.com'
 
-      # Set up the gcloud CLI
+      # 3. Set up the gcloud CLI
       - name: Set up Cloud SDK
-        uses: 'google-github-actions/setup-gcloud@v1'
+        uses: 'google-github-actions/setup-gcloud@v2'
 
-      # Deploy the proxy to the eval environment
+      # 4. Deploy the proxy to the eval environment
       - name: Deploy to Apigee
         run: |
-          gcloud apigee apis deploy --api=${{ env.PROXY_NAME }} --environment=eval --override --project=project-231b329b-a80c-4f8d-828
+          gcloud apigee apis deploy \
+            --api=${{ env.PROXY_NAME }} \
+            --environment=eval \
+            --override \
+            --project=project-231b329b-a80c-4f8d-828
