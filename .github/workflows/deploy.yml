@@ -1,51 +1,57 @@
-name: Deploy Apigee Proxy
+name: Deploy Apigee API Proxy
 
 on:
   push:
-    branches: [ test ] # Triggers when you push to the test branch
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  PROXY_NAME: hello-world
+  PROJECT_ID: project-231b329b-a80c-4f8d-828
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    permissions:
-      contents: 'read'
-      id-token: 'write'
-
+    
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      # This logic sets the proxy name to "my-proxy-test" for the test branch
-      - name: Set Proxy Name
-        run: |
-          echo "PROXY_NAME=hello-world" >> $GITHUB_ENV
-
-       # Bundle the proxy files into a zip (Requirement for import)
-      - name: Bundle API Proxy
-        run: |
-          zip -r apiproxy.zip apiproxy
-
-      # Import the API Proxy to Apigee (Creates the resource if it doesn't exist)
-      - name: Import API Proxy
-        run: |
-          gcloud apigee apis import ${{ env.PROXY_NAME }} \
-            --source=apiproxy.zip \
-            --project=project-231b329b-a80c-4f8d-828
-
-      - name: Authenticate to Google Cloud
-        id: 'auth'
-        uses: 'google-github-actions/auth@v2'
-        with:
-          workload_identity_provider: 'projects/172484352684/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
-          service_account: 'apigee-github-deployer@project-231b329b-a80c-4f8d-828.iam.gserviceaccount.com'
+      - name: Checkout code
+        uses: actions/checkout@v3
 
       - name: Set up Cloud SDK
-        uses: 'google-github-actions/setup-gcloud@v2'
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          export_default_credentials: true
 
-      - name: Deploy to Apigee
+      - name: Install Apigee CLI
         run: |
-          gcloud apigee apis deploy \
+          gcloud components install apigee-management
+
+      - name: Create ZIP package
+        run: |
+          cd apiproxy
+          zip -r ../apiproxy.zip .
+          cd ..
+
+      - name: Upload API Proxy
+        run: |
+          gcloud apigee apis create \
+            --name=${{ env.PROXY_NAME }} \
+            --project=${{ env.PROJECT_ID }} || true
+
+      - name: Create Proxy Revision
+        run: |
+          gcloud apigee apis versions upload 1 \
+            --source=apiproxy.zip \
             --api=${{ env.PROXY_NAME }} \
-            --environment=eval \
-            --override \
-            --project=project-231b329b-a80c-4f8d-828
+            --project=${{ env.PROJECT_ID }}
+
+      - name: Deploy Proxy
+        run: |
+          gcloud apigee envs deployments create \
+            --api=${{ env.PROXY_NAME }} \
+            --environment=prod \
+            --revision=1 \
+            --project=${{ env.PROJECT_ID }}
