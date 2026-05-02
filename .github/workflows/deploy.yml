@@ -2,7 +2,7 @@ name: Deploy Apigee Proxy
 
 on:
   push:
-    branches: [ test ] # Triggers when you push to the test branch
+    branches: [ test ]
 
 jobs:
   deploy:
@@ -15,23 +15,11 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # This logic sets the proxy name to "my-proxy-test" for the test branch
       - name: Set Proxy Name
         run: |
           echo "PROXY_NAME=hello-world" >> $GITHUB_ENV
 
-       # Bundle the proxy files into a zip (Requirement for import)
-      - name: Bundle API Proxy
-        run: |
-          cd apiproxy && zip -r ../apiproxy.zip . && cd ..
-
-      # Import the API Proxy to Apigee (Creates the resource if it doesn't exist)
-      - name: Import API Proxy
-        run: |
-          gcloud apigee apis import ${{ env.PROXY_NAME }} \
-            --source=apiproxy.zip \
-            --project=project-231b329b-a80c-4f8d-828
-
+      # MOVED AUTHENTICATION AND SETUP TO THE TOP
       - name: Authenticate to Google Cloud
         id: 'auth'
         uses: 'google-github-actions/auth@v2'
@@ -42,6 +30,20 @@ jobs:
       - name: Set up Cloud SDK
         uses: 'google-github-actions/setup-gcloud@v2'
 
+      # Bundle the proxy files
+      - name: Bundle API Proxy
+        run: |
+          cd apiproxy && zip -r ../apiproxy.zip . && cd ..
+
+      # Import the API Proxy (Must happen after setup-gcloud and auth)
+      - name: Import API Proxy
+        run: |
+          gcloud apigee apis import \
+            --name=${{ env.PROXY_NAME }} \
+            --source=apiproxy.zip \
+            --project=project-231b329b-a80c-4f8d-828
+
+      # Deploy the API Proxy
       - name: Deploy to Apigee
         run: |
           gcloud apigee apis deploy \
